@@ -65,3 +65,25 @@ void * malloc_counted(size_t howmuch, size_t *pot)
 	*pot += howmuch;
 	return malloc(howmuch);
 }
+
+
+/**
+ * If our C library can get malloc statistics, then show them to FINFO
+ **/
+void show_malloc_stats(void)
+{
+#ifdef HAVE_MALLINFO
+	struct mallinfo mi;
+
+	mi = mallinfo();
+
+	rprintf(FINFO, "VM statistics:\n"
+		"  %10s\n",
+		"bytes");
+
+	rprintf(FINFO, "  %10ld      from sbrk()\n", (long) mi.arena);
+	rprintf(FINFO, "  %10ld      from mmap()\n", (long) mi.hblkhd);
+	rprintf(FINFO, "  %10ld      in use\n", (long) mi.uordblks);
+	rprintf(FINFO, "  %10ld      free in heap\n", (long) mi.fordblks);
+#endif				/* HAVE_MALLINFO */
+}
