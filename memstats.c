@@ -39,15 +39,15 @@ void show_mem_stats(void)
 	
 	rprintf(FINFO, "Memory usage:\n"
 		"  %10s\n"
-		"  %10ld    file_list\n"
-		"    %10ld  flist_size\n"  
-		"  %10ld    hlink_list\n"
-		"  %10ld    file_structs (and associated data)\n"
-		"  %10ld    string_areas\n"
-		"  %10ld    exclude_structs\n"
-		"  %10ld    map_structs\n"
-		"  %10ld    tags\n"
-		"  %10ld    delete_list\n"
+		"  %10ld                               file_list\n"
+		"  %10ld                                 flist_size\n"  
+		"  %10ld                               hlink_list\n"
+		"  %10ld                               file_structs (and associated data)\n"
+		"  %10ld                               string_areas\n"
+		"  %10ld                               exclude_structs\n"
+		"  %10ld                               map_structs\n"
+		"  %10ld                               tags\n"
+		"  %10ld                               delete_list\n"
 		,
 		"bytes",
 		(long) stats.main_flist,
@@ -83,9 +83,13 @@ void show_malloc_stats(void)
 		"  %10s\n",
 		"bytes");
 
-	rprintf(FINFO, "  %10ld      from sbrk()\n", (long) mi.arena);
-	rprintf(FINFO, "  %10ld      from mmap()\n", (long) mi.hblkhd);
-	rprintf(FINFO, "  %10ld      in use\n", (long) mi.uordblks);
-	rprintf(FINFO, "  %10ld      free in heap\n", (long) mi.fordblks);
+	rprintf(FINFO, "  %10ld                               from sbrk()\n",
+		(long) mi.arena);
+	rprintf(FINFO, "  %10ld                               from mmap()\n",
+		(long) mi.hblkhd);
+	rprintf(FINFO, "  %10ld                               in use\n",
+		(long) mi.uordblks);
+	rprintf(FINFO, "  %10ld                               free in heap\n",
+		(long) mi.fordblks);
 #endif				/* HAVE_MALLINFO */
 }

@@ -26,13 +26,13 @@ void show_file_stats(void)
 
 	rprintf(FINFO, "File statistics:\n"
 		"  %10s %12s\n"
-		"  %10ld %12.0f                         files\n"
-		"  %10ld %12.0f                           transferred\n"
-		"  %10ld %12.0f                             new\n"
-		"             %12.0f                         literal data\n"
-		"             %12.0f                         matched data\n"
-		" %10s %12s                               up-to-date\n"
-		" %10s %12s                               removed\n"
+		"  %10ld %12.0f                  files\n"
+		"  %10ld %12.0f                    transferred\n"
+		"  %10ld %12.0f                      new\n"
+		"             %12.0f                      literal data\n"
+		"             %12.0f                      matched data\n"
+		"  %10s %12s                    up-to-date\n"
+		"  %10s %12s                    removed\n"
 		,
 		"files", "bytes",
 		(long) stats.num_files,
@@ -57,7 +57,7 @@ void show_net_stats(void)
 	
 	rprintf(FINFO, "Network statistics\n"
 		"  %10s %10s %10s\n"
-		"  %10.0f %10.0f %10.2f                total bytes\n"
+		"  %10.0f %10.0f %10.2f         total bytes\n"
 		,
 		"read", "write", "bytes/s",
 		(double) stats.total_read,
@@ -70,7 +70,7 @@ void show_time_stats(void)
 {
 	rprintf(FINFO, "Timing statistics\n"
 		"  %10s\n"
-		"  %10ld                                      elapsed\n"
+		"  %10ld                               elapsed\n"
 		,
 		"seconds",
 		(long) time(NULL)-starttime);
