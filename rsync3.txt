@@ -192,8 +192,9 @@ Command-line options:
 
 Scripting issues:
 
-  - Perhaps support multiple scripting languages: candidates include
-    Perl, Python, Tcl, Scheme (guile?), sh, ...
+  - Perhaps support multiple scripting languages:  candidates include
+    Perl, Python, Tcl, lisp (librep?), Scheme (siod, guile, elk,
+    minischeme, Kali, STk?), sh, ICI, Lua, Ruby, Pike, smalltalk...
 
   - Simply running a subprocess and looking at its stdout/exit code
     might be sufficient, though it could also be pretty slow if it's
@@ -208,13 +209,30 @@ Scripting issues:
 
   - Tcl is broken Lisp.
 
+  - librep is desgined for embedding.
+
   - Lots of sysadmins know Perl, though Perl can give some bizarre or
     confusing errors.  The built in stat operators and regexps might
     be useful.
 
-  - Sadly probably not enough people know Scheme.
+  - Sadly probably not enough people know Scheme, but with the number of
+    scheme-based application scripting languages they're going to have
+    to learn it anyway!
 
-  - sh is hard to embed.
+    - siod is designed for embedding and is very small.
+
+    - kali is designed for handling distributed executable content.
+
+    - elk & guile are both designed for embedding.
+
+  - sh is hard to embed and even a full POSIX shell leaves a lot to be
+    desired as a useful programming language.
+
+  - Ruby is truly object-oriented.
+
+  - ICI or Pike will keep C programmers happy.
+
+  - Lua is simple to learn and small and designed for embedding.
 
 
 Scripting hooks:
@@ -396,18 +414,64 @@ Conflict resolution:
     would be useful.
 
 
-Moved files: <http://rsync.samba.org/cgi-bin/rsync.fom?file=44>
-
-  - There's no trivial way to detect renamed files, especially if they
-    move between directories.
-
-  - If we had a picture of the remote directory from last time on
-    either machine, then the inode numbers might give us a hint about
-    files which may have been renamed.
+Moved files:
 
   - Files that are renamed and not modified can be detected by
-    examining the directory listing, looking for files with the same
-    size/date as the origin.
+    pre-calculating whole-file hash (MD5?) signatures for all files in
+    the target heirarchy (source files need only have their whole-file
+    hash calculated just before they would be transferred).
+
+    - whenever you're about to copy a whole file to the target hierarchy
+      (there's no matching filename in the target directory) first
+      search for a matching file already in the target hierarchy and if
+      one is found:
+
+      - if the matching file is missing in the source directory then
+        first try to create the new target file with a hard link
+        (presumably the source file will be deleted, if deletions in the
+        target hierarchy are permitted by the command-line/config options)
+
+      - if the source file and target directory are on different
+        machines then simply make the copy locally within the target
+        hierarchy on the target machine
+
+      - if the source file and target directory are on the same machine
+        then make the copy from whichever file is on a different
+        filesystem (st_dev) from the target directory [it is possible
+        the target hierarchy spans two filesystems and thus the existing
+        copy in the target might be in a different filesystem from the
+        target directory]
+
+    - whenever updating a target file with the normal rsync algorithm
+      first search for duplicates of the current target's whole-file
+      hash value and then update all identical targets simultaneously
+      with the same data blocks from the source file.  Remember the
+      source file's whole-file hash value so that when each of the
+      updated targets is encountered in the source hierarchy the
+      matching source file can be checked to be sure it too is still
+      identical to the initially encountered source file that the update
+      was done from.  [if the source file in the matching location for
+      an already updated duplicate turns out to be different from the
+      source file used to update the duplicate then perhaps it would be
+      good, at least when on different machines, to have a saved copy of
+      the un-touched target so that the previous updates to it can be
+      quickly undone, but this complicates cleanup quite a bit]
+      
+    - all deleted files are handled normally.
+
+    - all file meta-data are handled normally.
+
+  - There's no trivial way to detect renamed and modified files, though
+    by also pre-calculating the hash signatures for each block of each
+    file in the target hierarchy then fuzzy matching heuristics (eg. if
+    more than some percentage of blocks are identical) could identify
+    new files which have many blocks in common and thus which could
+    first be copied locally on the target and then updated with the
+    normal rsync algorithm.  Keeping all this data for very large
+    hierarchies might still be too expensive though so perhaps it should
+    only be done if some noticable percentage of large files (savings
+    are only possible if the files are multiple blocks in length) in the
+    target hierarchy are apparently missing and would need copying.
 
 
 Filesystem migration:
