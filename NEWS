@@ -1,4 +1,10 @@
 rsync changes in 2.6.0cvs
+  
+  BUG FIXES:
+
+    * Portability fixes for test suite on Solaris and BSD.  (Jos
+      Backus, Martin Pool)
+
 
   ENHANCEMENTS:
 
