@@ -20,6 +20,14 @@
 /* support rsync authentication */
 #include "rsync.h"
 
+#if defined(__CYGWIN__) || defined(WIN32)
+/* This, along with the "rt" for stdio, means that people can have
+ * CRLF in configuration files without troubles. */
+#  define CONFIG_OPEN_MODE (O_RDONLY|O_TEXT)
+#else
+#  define CONFIG_OPEN_MODE O_RDONLY
+#endif
+
 /***************************************************************************
 encode a buffer using base64 - simple and slow algorithm. null terminates
 the result.
@@ -82,13 +90,22 @@ static int get_secret(int module, char *user, char *secret, int len)
 
 	if (!fname || !*fname) return 0;
 
-	fd = open(fname,O_RDONLY);
+	fd = open(fname, CONFIG_OPEN_MODE);
 	if (fd == -1) return 0;
 
 	if (do_stat(fname, &st) == -1) {
 		rsyserr(FERROR, errno, "stat(%s)", fname);
 		ok = 0;
 	} else if (lp_strict_modes(module)) {
+		/* Under CYGWIN, we don't want to force attribute
+		   check. It can be made to work if env var CYGWIN
+		   contains "ntea" (nt extended attribute mode), but
+		   frankly, it is a MAJOR pain in the ass to get
+		   working especially when trying to run rsync as a NT
+		   service. Besides, CYGWIN permissions won't give us
+		   any added security -- the security should be
+		   handled with NTFS ACL's. */
+#ifndef __CYGWIN__
 		if ((st.st_mode & 06) != 0) {
 			rprintf(FERROR,"secrets file must not be other-accessible (see strict modes option)\n");
 			ok = 0;
@@ -96,6 +113,7 @@ static int get_secret(int module, char *user, char *secret, int len)
 			rprintf(FERROR,"secrets file must be owned by root when running as root (see strict modes)\n");
 			ok = 0;
 		}
+#endif
 	}
 	if (!ok) {
 		rprintf(FERROR,"continuing without secrets file\n");
@@ -144,7 +162,7 @@ static char *getpassf(char *filename)
 
 	if (!filename) return NULL;
 
-	if ( (fd=open(filename,O_RDONLY)) == -1) {
+	if ( (fd=open(filename, CONFIG_OPEN_MODE)) == -1) {
 		rsyserr(FERROR, errno, "could not open password file \"%s\"",filename);
 		if (envpw) rprintf(FERROR,"falling back to RSYNC_PASSWORD environment variable.\n");	
 		return NULL;
@@ -153,6 +171,15 @@ static char *getpassf(char *filename)
 	if (do_stat(filename, &st) == -1) {
 		rsyserr(FERROR, errno, "stat(%s)", filename);
 		ok = 0;
+	} 
+#ifndef __CYGWIN__
+	/* Under CYGWIN, we don't want to force attribute check. It
+	   can be made to work if env var CYGWIN contains "ntea" (nt
+	   extended attribute mode), but frankly, it is a MAJOR pain
+	   in the ass to get working especially when trying to run
+	   rsync as a NT service. Besides, CYGWIN permissions won't
+	   give us any added security -- the security should be
+	   handled with NTFS ACL's. */
 	} else if ((st.st_mode & 06) != 0) {
 		rprintf(FERROR,"password file must not be other-accessible\n");
 		ok = 0;
@@ -160,6 +187,7 @@ static char *getpassf(char *filename)
 		rprintf(FERROR,"password file must be owned by root when running as root\n");
 		ok = 0;
 	}
+#endif
 	if (!ok) {
 		rprintf(FERROR,"continuing without password file\n");
 		if (envpw) rprintf(FERROR,"using RSYNC_PASSWORD environment variable.\n");

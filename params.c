@@ -488,7 +488,7 @@ static FILE *OpenConfFile( char *FileName )
     return( NULL );
     }
 
-  OpenedFile = fopen( FileName, "r" );
+  OpenedFile = fopen( FileName, "rt" );
   if( NULL == OpenedFile )
     {
     rprintf(FERROR,"%s Unable to open configuration file \"%s\":\n\t%s\n",

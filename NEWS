@@ -1,2 +1,11 @@
 rsync changes in 2.6.0cvs
 
+  ENHANCEMENTS:
+
+    * For Cygwin: (Ville Herva, Martin Pool)
+
+       - Allow config files to contain CRLF
+
+       - Don't check modes and ownership on config/password files,
+         because this security test is more likely to be a pain than a
+         help on Cygwin.
