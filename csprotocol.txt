@@ -48,11 +48,11 @@ If the login is acceptable, then the server will respond with
   @RSYNCD: OK
 
 The client now writes some rsync options, as if it were remotely
-executing the command.  The server parses these arguments as if it had
-just been invoked with them, but they're added to the existing state.
-So if the client specifies a list of files to be included or excluded,
-they'll defer to existing limits specified in the server
-configuration.
+executing the command.  These are terminated by a single blank line.
+The server parses these arguments as if it had just been invoked with
+them, but they're added to the existing state.  So if the client
+specifies a list of files to be included or excluded, they'll defer to
+existing limits specified in the server configuration.
 
 The server then talks to the client as normal across the socket,
 passing checksums, file lists and so on.  For documentation of that,

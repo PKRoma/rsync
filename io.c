@@ -1,6 +1,5 @@
-/* -*- c-file-style: "linux" -*-
-   
-   Copyright (C) 1996-2000 by Andrew Tridgell 
+/* 
+   Copyright (C) Andrew Tridgell 1996
    Copyright (C) Paul Mackerras 1996
    
    This program is free software; you can redistribute it and/or modify
@@ -22,8 +21,12 @@
   socket and pipe IO utilities used in rsync 
 
   tridge, June 1996
+
+  Midstrength stream cypher privacy added by Martin Pool, October 2000.
   */
 #include "rsync.h"
+#include "lib/arcfour.h"
+#include "assert.h"
 
 /* if no timeout is specified then use a 60 second select timeout */
 #define SELECT_TIMEOUT 60
@@ -39,6 +42,8 @@ static int eof_error=1;
 extern int verbose;
 extern int io_timeout;
 extern struct stats stats;
+
+extern ArcfourContext arcfour_enc_ctx, arcfour_dec_ctx;
 
 static int io_error_fd = -1;
 
@@ -104,9 +109,16 @@ static void read_error_fd(void)
 
 static int no_flush;
 
-/* read from a socket with IO timeout. return the number of
-   bytes read. If no bytes can be read then exit, never return
-   a number <= 0 */
+/*
+ * This is the most fundamental socket read function -- the only one that
+ * actually calls the kernel.
+ *
+ * It reads from a socket with IO timeout. return the number of bytes
+ * read. If no bytes can be read then exit, never return a number <= 0
+ *
+ * If arcfour_enabled is set, it decrypts data while reading using the
+ * global arcfour state.
+ */
 static int read_timeout(int fd, char *buf, int len)
 {
 	int n, ret=0;
@@ -147,6 +159,12 @@ static int read_timeout(int fd, char *buf, int len)
 		n = read(fd, buf, len);
 
 		if (n > 0) {
+                        /* arcfour can decrypt in place. */
+                        if (arcfour_enabled) {
+                                rprintf(FERROR, "decrypt %d bytes..", n);
+                                arcfour_decrypt(&arcfour_dec_ctx, buf, buf, n);
+                                rprintf(FERROR, "done\n");
+                        }
 			buf += n;
 			len -= n;
 			ret += n;
@@ -318,8 +336,14 @@ unsigned char read_byte(int f)
 	return c;
 }
 
-/* write len bytes to fd */
-static void writefd_unbuffered(int fd,char *buf,int len)
+
+/*
+ * Write len bytes to fd.
+ *
+ * If arcfour_enabled is true, encrypt all data as it passes onto the
+ * wire using the global arcfour state.
+ */
+static void writefd_unbuffered(int fd, char const *buf, int len)
 {
 	int total = 0;
 	fd_set w_fds, r_fds;
@@ -364,8 +388,8 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 
 		if (FD_ISSET(fd, &w_fds)) {
 			int ret, n = len-total;
-			
-			ret = write(fd,buf+total,n);
+
+                        ret = write(fd,buf+total,n);
 
 			if (ret == -1 && errno == EINTR) {
 				continue;
@@ -406,6 +430,33 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 }
 
 
+/* build up a temporary buffer of encrypted data */
+static void writefd_encrypt(int fd, char const *buf, int len)
+{
+        static char *arcbuf = NULL;
+        static int buf_len = 0;
+        
+        if (arcfour_enabled) {
+                assert(len > 0);
+                if (len > buf_len  ||  !arcbuf) {
+                        if (arcbuf)
+                                free(arcbuf);
+                        arcbuf = malloc(len);
+                        buf_len = len;
+                }
+
+                rprintf(FERROR, "encrypt %d bytes ..", len);
+
+                arcfour_encrypt(&arcfour_dec_ctx, arcbuf, buf, len);
+//                writefd_unbuffered(fd, arcbuf, len);
+                writefd_unbuffered(fd, buf, len);
+                rprintf(FERROR, "done\n");
+        } else {
+                writefd_unbuffered(fd, buf, len);
+        }
+}
+
+
 static char *io_buffer;
 static int io_buffer_count;
 
@@ -432,13 +483,13 @@ static void mplex_write(int fd, enum logcode code, char *buf, int len)
 	}
 
 	memcpy(&buffer[4], buf, n);
-	writefd_unbuffered(fd, buffer, n+4);
+	writefd_encrypt(fd, buffer, n+4);
 
 	len -= n;
 	buf += n;
 
 	if (len) {
-		writefd_unbuffered(fd, buf, len);
+		writefd_encrypt(fd, buf, len);
 	}
 }
 
@@ -451,13 +502,11 @@ void io_flush(void)
 	if (io_multiplexing_out) {
 		mplex_write(fd, FNONE, io_buffer, io_buffer_count);
 	} else {
-		writefd_unbuffered(fd, io_buffer, io_buffer_count);
+		writefd_encrypt(fd, io_buffer, io_buffer_count);
 	}
 	io_buffer_count = 0;
 }
 
-
-/* XXX: fd is ignored, which seems a little strange. */
 void io_end_buffering(int fd)
 {
 	io_flush();
@@ -483,7 +532,7 @@ static void writefd(int fd,char *buf,int len)
 	stats.total_written += len;
 
 	if (!io_buffer || fd != multiplex_out_fd) {
-		writefd_unbuffered(fd, buf, len);
+		writefd_encrypt(fd, buf, len);
 		return;
 	}
 
@@ -508,11 +557,6 @@ void write_int(int f,int32 x)
 	writefd(f,b,4);
 }
 
-
-/*
- * Note: int64 may actually be a 32-bit type if ./configure couldn't find any
- * 64-bit types on this platform.
- */
 void write_longint(int f, int64 x)
 {
 	extern int remote_version;

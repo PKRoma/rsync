@@ -423,7 +423,9 @@ static int start_daemon(int fd)
 		if (!*line || strcmp(line,"#list")==0) {
 			send_listing(fd);
 			return -1;
-		} 
+		}
+
+                /* XXX: send #privacy here? */
 
 		if (*line == '#') {
 			/* it's some sort of command that I don't understand */

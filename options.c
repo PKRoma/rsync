@@ -1,6 +1,7 @@
-/*  -*- c-file-style: "linux" -*-
+/* -*- c-file-style: "linux"; -*-
     
     Copyright (C) 1998-2000 by Andrew Tridgell 
+    Copyright (C) by Andrew Tridgell 1998, 1999, 2000
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -74,6 +75,7 @@ int modify_window=2;
 int modify_window=0;
 #endif
 int blocking_io=0;
+int want_privacy=0;
 
 char *backup_suffix = BACKUP_SUFFIX;
 char *tmpdir = NULL;
@@ -96,27 +98,10 @@ static int modify_window_set;
 
 struct in_addr socket_address = {INADDR_ANY};
 
-
-static void print_rsync_version(void)
-{
-        rprintf(FINFO, "rsync version %s  protocol version %d (%d-bit files)\n\n",
-                VERSION, PROTOCOL_VERSION,
-                sizeof(int64) * 8);
-        rprintf(FINFO, "Written by Andrew Tridgell and Paul Mackerras\n");
-        rprintf(FINFO, "http://rsync.samba.org/\n");
-#ifdef NO_INT64
-        rprintf(FINFO, "WARNING: no 64-bit integers on this platform!\n");
-#endif
-}
-
-
 void usage(enum logcode F)
 {
   rprintf(F,"rsync version %s Copyright Andrew Tridgell and Paul Mackerras\n\n",
 	  VERSION);
-#ifdef NO_INT64
-  rprintf(F, "WARNING: no 64-bit integers on this platform!\n");
-#endif
 
   rprintf(F,"rsync is a file transfer program capable of efficient remote update\nvia a fast differencing algorithm.\n\n");
 
@@ -190,6 +175,7 @@ void usage(enum logcode F)
   rprintf(F,"     --log-format=FORMAT     log file transfers using specified format\n");  
   rprintf(F,"     --password-file=FILE    get password from FILE\n");
   rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth, KBytes per second\n");
+  rprintf(F,"     --privacy               encrypt network traffic\n");
   rprintf(F," -h, --help                  show this help screen\n");
 
   rprintf(F,"\n");
@@ -206,7 +192,7 @@ enum {OPT_VERSION, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
       OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY, OPT_ADDRESS,
       OPT_DELETE_AFTER, OPT_EXISTING, OPT_MAX_DELETE, OPT_BACKUP_DIR, 
       OPT_IGNORE_ERRORS, OPT_BWLIMIT, OPT_BLOCKING_IO,
-      OPT_MODIFY_WINDOW};
+      OPT_MODIFY_WINDOW, OPT_PRIVACY};
 
 static char *short_options = "oblLWHpguDCtcahvqrRIxnSe:B:T:zP";
 
@@ -273,6 +259,7 @@ static struct option long_options[] = {
   {"address",     1,     0,    OPT_ADDRESS},
   {"max-delete",  1,     0,    OPT_MAX_DELETE},
   {"backup-dir",  1,     0,    OPT_BACKUP_DIR},
+  {"privacy",     0,     0,    OPT_PRIVACY},
   {0,0,0,0}};
 
 
@@ -335,7 +322,9 @@ int parse_arguments(int argc, char *argv[], int frommain)
 
 		switch (opt) {
 		case OPT_VERSION:
-                        print_rsync_version();
+			rprintf(FINFO,"rsync version %s  protocol version %d\n\n",
+				VERSION,PROTOCOL_VERSION);
+			rprintf(FINFO,"Written by Andrew Tridgell and Paul Mackerras\n");
 			exit_cleanup(0);
 			
 		case OPT_SUFFIX:
@@ -612,6 +601,10 @@ int parse_arguments(int argc, char *argv[], int frommain)
 			backup_dir = optarg;
 			break;
 
+                case OPT_PRIVACY:
+                        want_privacy = 1;
+                        break;
+
 		default:
 			slprintf(err_buf,sizeof(err_buf),"unrecognised option\n");
 			return 0;
@@ -761,6 +754,9 @@ void server_options(char **args,int *argc)
 
 	if (only_existing && am_sender)
 		args[ac++] = "--existing";
+
+        if (want_privacy)
+                args[ac++] = "--privacy";
 
 	if (tmpdir) {
 		args[ac++] = "--temp-dir";

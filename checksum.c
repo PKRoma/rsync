@@ -140,7 +140,7 @@ void sum_init(void)
 	sum_update(s,4);
 }
 
-void sum_update(char *p,int len)
+void sum_update(char const *p,int len)
 {
 	int i;
 	if (len + sumresidue < CSUM_CHUNK) {

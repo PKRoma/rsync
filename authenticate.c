@@ -24,7 +24,7 @@
 encode a buffer using base64 - simple and slow algorithm. null terminates
 the result.
   ***************************************************************************/
-static void base64_encode(char *buf, int len, char *out)
+void base64_encode(char *buf, int len, char *out)
 {
 	char *b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 	int bit_offset, byte_offset, idx, i;
@@ -202,6 +202,9 @@ static void generate_hash(char *in, char *challenge, char *out)
    return "" if anonymous access
 
    otherwise return username
+
+   As a side effect, updates the server's copy of the encryption key,
+   in case we later decide to use a cyphered connection.
 */
 char *auth_server(int fd, int module, char *addr, char *leader)
 {
@@ -254,6 +257,9 @@ char *auth_server(int fd, int module, char *addr, char *leader)
 	}
 
 	generate_hash(secret, b64_challenge, pass2);
+
+        privacy_create_key(user, secret, b64_challenge);
+
 	memset(secret, 0, sizeof(secret));
 	
 	if (strcmp(pass, pass2) == 0)
@@ -263,6 +269,15 @@ char *auth_server(int fd, int module, char *addr, char *leader)
 }
 
 
+/*
+ * Generate the client's response to the specified challenge.
+ * The password comes from either the local secret file, or the
+ * environment, or failing that from stdin.
+ *
+ * As a side effect, this creates the client's copy of the privacy
+ * key, so that if we later start encrypting we'll have the secret
+ * already in place.
+ */
 void auth_client(int fd, char *user, char *challenge)
 {
 	char *pass;
@@ -281,6 +296,8 @@ void auth_client(int fd, char *user, char *challenge)
 
 	generate_hash(pass, challenge, pass2);
 	io_printf(fd, "%s %s\n", user, pass2);
+
+        privacy_create_key(user, pass, challenge);
 }
 
 

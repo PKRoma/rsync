@@ -522,3 +522,7 @@ size_t strlcat(char *d, const char *s, size_t bufsize);
 #endif
 
 #define exit_cleanup(code) _exit_cleanup(code, __FILE__, __LINE__)
+
+
+void privacy_create_key(char const *user, char const *pass, char const *salt);
+int arcfour_enabled;
