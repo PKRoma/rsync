@@ -25,14 +25,14 @@ void show_file_stats(void)
 	extern struct stats stats;
 
 	rprintf(FINFO, "File statistics:\n"
-		" %10s %12s\n"
-		" %10ld %12.0f   files\n"
-		" %10ld %12.0f     transferred\n"
-		" %10ld %12.0f       new\n"
-		"            %12.0f       literal data\n"
-		"            %12.0f       matched data\n"
-		" %10s %12s     up-to-date\n"
-		" %10s %12s     removed\n"
+		"  %10s %12s\n"
+		"  %10ld %12.0f                         files\n"
+		"  %10ld %12.0f                           transferred\n"
+		"  %10ld %12.0f                             new\n"
+		"             %12.0f                         literal data\n"
+		"             %12.0f                         matched data\n"
+		" %10s %12s                               up-to-date\n"
+		" %10s %12s                               removed\n"
 		,
 		"files", "bytes",
 		(long) stats.num_files,
@@ -49,9 +49,15 @@ void show_file_stats(void)
 void show_net_stats(void)
 {
 	time_t t = time(NULL);
+
+	/* stats.total_written is are accumulated in writefd, which is
+	 * called after compression of data.  It might be interesting
+	 * to also hook in above that level to keep track of the
+	 * amount of data before compression. */
+	
 	rprintf(FINFO, "Network statistics\n"
-		" %10s %10s %10s\n"
-		" %10.0f %10.0f %10.2f    total bytes\n"
+		"  %10s %10s %10s\n"
+		"  %10.0f %10.0f %10.2f                total bytes\n"
 		,
 		"read", "write", "bytes/s",
 		(double) stats.total_read,
@@ -62,4 +68,10 @@ void show_net_stats(void)
 
 void show_time_stats(void)
 {
+	rprintf(FINFO, "Timing statistics\n"
+		"  %10s\n"
+		"  %10ld                                      elapsed\n"
+		,
+		"seconds",
+		(long) time(NULL)-starttime);
 }
