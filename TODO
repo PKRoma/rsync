@@ -365,6 +365,14 @@ Better statistics:
   <mbp> it would be nice to improve it
   <mbp> that would also work well with --dryrun
 
+
+Show statistics even if interrupted:
+
+  If somebody gets sick of rsync thrashing and hits C-c, it would be
+  good to show them where all the memory had got to.  This probably
+  means we need an orderly shutdown on interrupt.
+
+
 TDB:
 
   Rather than storing the file list in memory, store it in a TDB.
