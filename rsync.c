@@ -67,21 +67,21 @@ int delete_file(char *fname)
 
 	if (!S_ISDIR(st.st_mode)) {
 		if (robust_unlink(fname) == 0 || errno == ENOENT) return 0;
-		rprintf(FERROR,"delete_file: unlink(%s) : %s\n", fname, strerror(errno));
+		rprintf(FERROR,"unlink(%s) : %s\n", fname, strerror(errno));
 		return -1;
 	}
 
 	if (do_rmdir(fname) == 0 || errno == ENOENT) return 0;
 	if (!force_delete || !recurse || 
 	    (errno != ENOTEMPTY && errno != EEXIST)) {
-		rprintf(FERROR,"delete_file: rmdir(%s) : %s\n", fname, strerror(errno));
+		rprintf(FERROR,"rmdir(%s) : %s\n", fname, strerror(errno));
 		return -1;
 	}
 
 	/* now we do a recsursive delete on the directory ... */
 	d = opendir(fname);
 	if (!d) {
-		rprintf(FERROR,"delete_file: opendir(%s): %s\n",
+		rprintf(FERROR,"opendir(%s): %s\n",
 			fname,strerror(errno));
 		return -1;
 	}
@@ -91,7 +91,7 @@ int delete_file(char *fname)
 		if (strcmp(dname,".")==0 ||
 		    strcmp(dname,"..")==0)
 			continue;
-		snprintf(buf, sizeof(buf), "%s/%s", fname, dname);
+		slprintf(buf, sizeof(buf), "%s/%s", fname, dname);
 		if (verbose > 0)
 			rprintf(FINFO,"deleting %s\n", buf);
 		if (delete_file(buf) != 0) {
@@ -103,7 +103,7 @@ int delete_file(char *fname)
 	closedir(d);
 	
 	if (do_rmdir(fname) != 0) {
-		rprintf(FERROR,"delete_file: rmdir(%s) : %s\n", fname, strerror(errno));
+		rprintf(FERROR,"rmdir(%s) : %s\n", fname, strerror(errno));
 		return -1;
 	}
 
@@ -226,6 +226,7 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 
 void sig_int(void)
 {
+	rprintf(FINFO,"\nrsync.c:sig_int() called.\n");
 	exit_cleanup(RERR_SIGNAL);
 }
 

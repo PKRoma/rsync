@@ -1,7 +1,6 @@
-/*  -*- c-file-style: "linux" -*-
-    
-    Copyright (C) 1996-2000 by Andrew Tridgell 
-    Copyright (C) Paul Mackerras 1996
+/* 
+   Copyright (C) Andrew Tridgell 1996
+   Copyright (C) Paul Mackerras 1996
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -93,9 +92,9 @@ int fd_pair(int fd[2])
    used to cope with badly broken rsh implementations like the one on
    solaris.
  */
-pid_t piped_child(char **command,int *f_in,int *f_out)
+int piped_child(char **command,int *f_in,int *f_out)
 {
-  pid_t pid;
+  int pid;
   int to_child_pipe[2];
   int from_child_pipe[2];
   extern int blocking_io;
@@ -108,7 +107,7 @@ pid_t piped_child(char **command,int *f_in,int *f_out)
 
 
   pid = do_fork();
-  if (pid == -1) {
+  if (pid < 0) {
     rprintf(FERROR,"fork: %s\n",strerror(errno));
     exit_cleanup(RERR_IPC);
   }
@@ -148,11 +147,12 @@ pid_t piped_child(char **command,int *f_in,int *f_out)
   return pid;
 }
 
-pid_t local_child(int argc, char **argv,int *f_in,int *f_out)
+int local_child(int argc, char **argv,int *f_in,int *f_out)
 {
-	pid_t pid;
+	int pid;
 	int to_child_pipe[2];
 	int from_child_pipe[2];
+	extern int read_batch;  /* dw */
 
 	if (fd_pair(to_child_pipe) < 0 ||
 	    fd_pair(from_child_pipe) < 0) {
@@ -162,7 +162,7 @@ pid_t local_child(int argc, char **argv,int *f_in,int *f_out)
 
 
 	pid = do_fork();
-	if (pid == -1) {
+	if (pid < 0) {
 		rprintf(FERROR,"fork: %s\n",strerror(errno));
 		exit_cleanup(RERR_IPC);
 	}
@@ -171,7 +171,10 @@ pid_t local_child(int argc, char **argv,int *f_in,int *f_out)
 		extern int am_sender;
 		extern int am_server;
 
-		am_sender = !am_sender;
+		if (read_batch)
+		    am_sender = 0;
+		else
+		    am_sender = !am_sender;
 		am_server = 1;		
 
 		if (dup2(to_child_pipe[0], STDIN_FILENO) < 0 ||
@@ -558,7 +561,10 @@ void glob_expand(char *base1, char **argv, int *argc, int maxargs)
 	s = strdup(s);
 	if (!s) out_of_memory("glob_expand");
 
-	if (asprintf(&base," %s/", base1) <= 0) out_of_memory("glob_expand");
+	base = (char *)malloc(strlen(base1)+3);
+	if (!base) out_of_memory("glob_expand");
+
+	sprintf(base," %s/", base1);
 
 	q = s;
 	while ((p = strstr(q,base)) && ((*argc) < maxargs)) {
@@ -584,6 +590,33 @@ void strlower(char *s)
 		s++;
 	}
 }
+
+/* this is like vsnprintf but it always null terminates, so you
+   can fit at most n-1 chars in */
+int vslprintf(char *str, int n, const char *format, va_list ap)
+{
+	int ret = vsnprintf(str, n, format, ap);
+	if (ret >= n || ret < 0) {
+		str[n-1] = 0;
+		return -1;
+	}
+	str[ret] = 0;
+	return ret;
+}
+
+
+/* like snprintf but always null terminates */
+int slprintf(char *str, int n, char *format, ...)
+{
+	va_list ap;  
+	int ret;
+
+	va_start(ap, format);
+	ret = vslprintf(str,n,format,ap);
+	va_end(ap);
+	return ret;
+}
+
 
 void *Realloc(void *p, int size)
 {
@@ -934,6 +967,7 @@ void msleep(int t)
  *******************************************************************/
 int cmp_modtime(time_t file1, time_t file2)
 {
+	time_t diff;
 	extern int modify_window;
 
 	if (file2 > file1) {
@@ -957,9 +991,9 @@ int _Insure_trap_error(int a1, int a2, int a3, int a4, int a5, int a6)
 {
 	static int (*fn)();
 	int ret;
-	char *cmd;
+	char cmd[1024];
 
-	asprintf(&cmd, "/usr/X11R6/bin/xterm -display :0 -T Panic -n Panic -e /bin/sh -c 'cat /tmp/ierrs.*.%d ; gdb /proc/%d/exe %d'", 
+	sprintf(cmd, "/usr/X11R6/bin/xterm -display :0 -T Panic -n Panic -e /bin/sh -c 'cat /tmp/ierrs.*.%d ; gdb /proc/%d/exe %d'", 
 		getpid(), getpid(), getpid());
 
 	if (!fn) {
@@ -971,8 +1005,6 @@ int _Insure_trap_error(int a1, int a2, int a3, int a4, int a5, int a6)
 	ret = fn(a1, a2, a3, a4, a5, a6);
 
 	system(cmd);
-
-	free(cmd);
 
 	return ret;
 }

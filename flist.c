@@ -47,6 +47,9 @@ extern int remote_version;
 extern int io_error;
 extern int sanitize_paths;
 
+extern int read_batch;
+extern int write_batch;
+
 static char topsrcname[MAXPATHLEN];
 
 static struct exclude_struct **local_exclude_list;
@@ -185,6 +188,8 @@ int link_stat(const char *Path, STRUCT_STAT *Buffer)
 static int match_file_name(char *fname,STRUCT_STAT *st)
 {
   if (check_exclude(fname,local_exclude_list,st)) {
+    if (verbose > 2)
+      rprintf(FINFO,"excluding file %s\n",fname);
     return 0;
   }
   return 1;
@@ -203,7 +208,7 @@ static void set_filesystem(char *fname)
 
 static int to_wire_mode(mode_t mode)
 {
-	if (S_ISLNK(mode) && (_S_IFLNK != 0120000)) {
+	if (S_ISLNK(mode) && (S_IFLNK != 0120000)) {
 		return (mode & ~(_S_IFMT)) | 0120000;
 	}
 	return (int)mode;
@@ -211,8 +216,8 @@ static int to_wire_mode(mode_t mode)
 
 static mode_t from_wire_mode(int mode)
 {
-	if ((mode & (_S_IFMT)) == 0120000 && (_S_IFLNK != 0120000)) {
-		return (mode & ~(_S_IFMT)) | _S_IFLNK;
+	if ((mode & (_S_IFMT)) == 0120000 && (S_IFLNK != 0120000)) {
+		return (mode & ~(_S_IFMT)) | S_IFLNK;
 	}
 	return (mode_t)mode;
 }
@@ -613,6 +618,9 @@ void send_file_name(int f,struct file_list *flist,char *fname,
 		  out_of_memory("send_file_name");
   }
 
+  if (write_batch) /*  dw  */
+    file->flags = FLAG_DELETE;
+
   if (strcmp(file->basename,"")) {
     flist->files[flist->count++] = file;
     send_file_entry(file,f,base_flags);
@@ -698,8 +706,6 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 
 	if (verbose && recurse && !am_server && f != -1) {
 		rprintf(FINFO,"building file list ... ");
-                if (verbose > 1)
-                        rprintf(FINFO, "\n");
 		rflush(FINFO);
 	}
 
@@ -841,6 +847,8 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 		io_end_buffering(f);
 		stats.flist_size = stats.total_written - start_write;
 		stats.num_files = flist->count;
+		if (write_batch) /*  dw  */
+		    write_batch_flist_info(flist->count, flist->files);
 	}
 
 	if (verbose > 2)
@@ -918,7 +926,7 @@ struct file_list *recv_file_list(int f)
   }
 
   /* if protocol version is >= 17 then recv the io_error flag */
-  if (f != -1 && remote_version >= 17) {
+  if (f != -1 && remote_version >= 17  && !read_batch) {  /* dw-added readbatch */
 	  extern int module_id;
 	  extern int ignore_errors;
 	  if (lp_ignore_errors(module_id) || ignore_errors) {

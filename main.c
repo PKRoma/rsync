@@ -1,6 +1,5 @@
-/* -*- c-file-style: "linux" -*-
-   
-   Copyright (C) 1996-2001 by Andrew Tridgell <tridge@samba.org>
+/* 
+   Copyright (C) Andrew Tridgell 1996
    Copyright (C) Paul Mackerras 1996
    
    This program is free software; you can redistribute it and/or modify
@@ -36,12 +35,6 @@ void wait_process(pid_t pid, int *status)
 		msleep(20);
 		io_flush();
 	}
-        
-        /* TODO: If the child exited on a signal, then log an
-         * appropriate error message.  Perhaps we should also accept a
-         * message describing the purpose of the child.  Also indicate
-         * this to the caller so that thhey know something went
-         * wrong.  */
 	*status = WEXITSTATUS(*status);
 }
 
@@ -125,18 +118,17 @@ static void report(int f)
 }
 
 
-/* Start the remote shell.   cmd may be NULL to use the default. */
-static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f_out)
+static int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f_out)
 {
 	char *args[100];
-	int i,argc=0;
-	pid_t ret;
+	int i,argc=0, ret;
 	char *tok,*dir=NULL;
 	extern int local_server;
 	extern char *rsync_path;
 	extern int blocking_io;
+	extern int read_batch;
 
-	if (!local_server) {
+	if (!read_batch && !local_server) { /* dw -- added read_batch */
 		if (!cmd)
 			cmd = getenv(RSYNC_RSH_ENV);
 		if (!cmd)
@@ -187,6 +179,8 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 	}
 
 	if (local_server) {
+		if (read_batch)
+		    create_flist_from_batch();
 		ret = local_child(argc, args, f_in, f_out);
 	} else {
 		ret = piped_child(args,f_in,f_out);
@@ -398,6 +392,9 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	extern int am_daemon;
 	extern int module_id;
 	extern int am_sender;
+	extern int read_batch;   /* dw */
+	extern int write_batch;  /* dw */
+	extern struct file_list *batch_flist;  /* dw */
 
 	if (verbose > 2)
 		rprintf(FINFO,"server_recv(%d) starting pid=%d\n",argc,(int)getpid());
@@ -423,7 +420,10 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	if (delete_mode && !delete_excluded)
 		recv_exclude_list(f_in);
 
-	flist = recv_file_list(f_in);
+	if (read_batch) /*  dw  */
+	    flist = batch_flist;
+	else
+	    flist = recv_file_list(f_in);
 	if (!flist) {
 		rprintf(FERROR,"server_recv: recv_file_list error\n");
 		exit_cleanup(RERR_FILESELECT);
@@ -447,6 +447,7 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 	extern int cvs_exclude;
 	extern int am_sender;
 	extern int remote_version;
+	extern int read_batch; /* dw */
 
 	setup_protocol(f_out, f_in);
 
@@ -457,9 +458,11 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 		io_start_multiplex_out(f_out);
 
 	if (am_sender) {
-		recv_exclude_list(f_in);
-		if (cvs_exclude)
+		if (!read_batch) { /* dw */
+		    recv_exclude_list(f_in);
+		    if (cvs_exclude)
 			add_cvs_excludes();
+		}
 		do_server_sender(f_in, f_out, argc, argv);
 	} else {
 		do_server_recv(f_in, f_out, argc, argv);
@@ -467,21 +470,19 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 	exit_cleanup(0);
 }
 
-
-/*
- * This is called once the connection has been negotiated.  It is used
- * for rsyncd, remote-shell, and local connections.
- */
-int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
+int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 {
 	struct file_list *flist;
 	int status = 0, status2 = 0;
 	char *local_name = NULL;
 	extern int am_sender;
 	extern int remote_version;
-	extern pid_t cleanup_child_pid;
+	extern int write_batch; /* dw */
+	extern int read_batch; /* dw */
+	extern struct file_list *batch_flist; /*  dw */
 
-	cleanup_child_pid = pid;
+	if (read_batch)
+	    flist = batch_flist;  /* dw */
 
 	set_nonblocking(f_in);
 	set_nonblocking(f_out);
@@ -499,20 +500,21 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			add_cvs_excludes();
 		if (delete_mode && !delete_excluded) 
 			send_exclude_list(f_out);
-		flist = send_file_list(f_out,argc,argv);
+		if (!read_batch) /*  dw -- don't write to pipe */
+		    flist = send_file_list(f_out,argc,argv);
 		if (verbose > 3) 
 			rprintf(FINFO,"file list sent\n");
 
 		send_files(flist,f_out,f_in);
-		if (remote_version >= 24) {
-			/* final goodbye message */		
-			read_int(f_in);
-		}
 		if (pid != -1) {
 			if (verbose > 3)
 				rprintf(FINFO,"client_run waiting on %d\n",pid);
 			io_flush();
 			wait_process(pid, &status);
+		}
+		if (remote_version >= 24) {
+			/* final goodbye message */		
+			read_int(f_in);
 		}
 		report(-1);
 		exit_cleanup(status);
@@ -523,13 +525,12 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		list_only = 1;
 	}
 	
-	send_exclude_list(f_out);
+	if (!write_batch) /* dw */
+	    send_exclude_list(f_out);
 	
 	flist = recv_file_list(f_in);
 	if (!flist || flist->count == 0) {
-		rprintf(FINFO, "client: nothing to do: "
-                        "perhaps you need to specify some filenames or "
-                        "the --recursive option?\n");
+		rprintf(FINFO,"client: nothing to do\n");
 		exit_cleanup(0);
 	}
 	
@@ -544,7 +545,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		wait_process(pid, &status);
 	}
 	
-	return MAX(status, status2);
+	return status | status2;
 }
 
 static char *find_colon(char *s)
@@ -562,32 +563,24 @@ static char *find_colon(char *s)
 	return p;
 }
 
-
-/*
- * Start a client for either type of remote connection.  Work out
- * whether the arguments request a remote shell or rsyncd connection,
- * and call the appropriate connection function, then run_client.
- */
 static int start_client(int argc, char *argv[])
 {
 	char *p;
 	char *shell_machine = NULL;
 	char *shell_path = NULL;
 	char *shell_user = NULL;
-	int ret;
-	pid_t pid;
+	int pid, ret;
 	int f_in,f_out;
 	extern int local_server;
 	extern int am_sender;
 	extern char *shell_cmd;
 	extern int rsync_port;
-	extern int whole_file;
-	char *argv0 = strdup(argv[0]);
+	extern int read_batch;
 
-	if (strncasecmp(URL_PREFIX, argv0, strlen(URL_PREFIX)) == 0) {
+	if (strncasecmp(URL_PREFIX, argv[0], strlen(URL_PREFIX)) == 0) {
 		char *host, *path;
 
-		host = argv0 + strlen(URL_PREFIX);
+		host = argv[0] + strlen(URL_PREFIX);
 		p = strchr(host,'/');
 		if (p) {
 			*p = 0;
@@ -603,12 +596,13 @@ static int start_client(int argc, char *argv[])
 		return start_socket_client(host, path, argc-1, argv+1);
 	}
 
-	p = find_colon(argv0);
+	if (!read_batch) { /* dw */
+	    p = find_colon(argv[0]);
 
 	if (p) {
 		if (p[1] == ':') {
 			*p = 0;
-			return start_socket_client(argv0, p+2, argc-1, argv+1);
+			return start_socket_client(argv[0], p+2, argc-1, argv+1);
 		}
 
 		if (argc < 1) {
@@ -618,7 +612,7 @@ static int start_client(int argc, char *argv[])
 
 		am_sender = 0;
 		*p = 0;
-		shell_machine = argv0;
+		shell_machine = argv[0];
 		shell_path = p+1;
 		argc--;
 		argv++;
@@ -628,8 +622,6 @@ static int start_client(int argc, char *argv[])
 		p = find_colon(argv[argc-1]);
 		if (!p) {
 			local_server = 1;
-			/* disable "rsync algorithm" when both sides local */
-			whole_file = 1;
 		} else if (p[1] == ':') {
 			*p = 0;
 			return start_socket_client(argv[argc-1], p+2, argc-1, argv);
@@ -650,7 +642,12 @@ static int start_client(int argc, char *argv[])
 		}
 		argc--;
 	}
-	
+	} else {
+	    am_sender = 1;  /*  dw */
+	    local_server = 1;  /* dw */
+	    shell_path = argv[argc-1];  /* dw */
+	}
+
 	if (shell_machine) {
 		p = strchr(shell_machine,'@');
 		if (p) {
@@ -694,15 +691,7 @@ static RETSIGTYPE sigusr1_handler(int val) {
 }
 
 static RETSIGTYPE sigusr2_handler(int val) {
-	extern int log_got_error;
-	if (log_got_error) _exit(RERR_PARTIAL);
 	_exit(0);
-}
-
-static RETSIGTYPE sigchld_handler(int val) {
-#ifdef WNOHANG
-	while (waitpid(-1, NULL, WNOHANG) > 0) ;
-#endif
 }
 
 int main(int argc,char *argv[])
@@ -712,11 +701,16 @@ int main(int argc,char *argv[])
 	extern int dry_run;
 	extern int am_daemon;
 	extern int am_server;
-	int ret;
+	extern int read_batch;   /*  dw */
+	extern int write_batch;  /*  dw */
+	extern char *batch_ext;   /*  dw */
+	int i;          /*   dw */
+	int orig_argc;  /* dw */
+
+	orig_argc = argc;   /* dw */
 
 	signal(SIGUSR1, sigusr1_handler);
 	signal(SIGUSR2, sigusr2_handler);
-	signal(SIGCHLD, sigchld_handler);
 
 	starttime = time(NULL);
 	am_root = (getuid() == 0);
@@ -732,13 +726,15 @@ int main(int argc,char *argv[])
 	   carried across */
 	orig_umask = (int)umask(0);
 
-	if (!parse_arguments(&argc, (const char ***) &argv, 1)) {
-                /* FIXME: We ought to call the same error-handling
-                 * code here, rather than relying on getopt. */
-		option_error();
+	if (!parse_arguments(argc, argv, 1)) {
 		exit_cleanup(RERR_SYNTAX);
 	}
 
+	argc -= optind;
+	argv += optind;
+	optind = 0;
+
+	signal(SIGCHLD,SIG_IGN);
 	signal(SIGINT,SIGNAL_CAST sig_int);
 	signal(SIGPIPE,SIGNAL_CAST sig_int);
 	signal(SIGHUP,SIGNAL_CAST sig_int);
@@ -749,6 +745,15 @@ int main(int argc,char *argv[])
 	   work when there are other child processes.  Also, on all systems
 	   that implement getcwd that way "pwd" can't be found after chroot. */
 	push_dir(NULL,0);
+
+	if (write_batch) { /* dw */
+	    create_batch_file_ext();
+	    write_batch_argvs_file(orig_argc, argc, argv);
+	}
+
+	if (read_batch) { /* dw */
+	    set_batch_file_ext(batch_ext);
+	}
 
 	if (am_daemon) {
 		return daemon_main();
@@ -775,8 +780,6 @@ int main(int argc,char *argv[])
 		start_server(STDIN_FILENO, STDOUT_FILENO, argc, argv);
 	}
 
-	ret = start_client(argc, argv);
-	exit_cleanup(ret);
-	return ret;
+	return start_client(argc, argv);
 }
 
