@@ -1,5 +1,14 @@
 -*- indented-text -*-
 
+Things to do for rsync -- we use this at the moment instead of a bug
+database, and patches that are promising but not yet clearly correct
+are kept in patches/.  
+
+Things in this file seem like more or less like good ideas and they'll
+probably be implemented eventually.  Things in ./rsync3.txt are
+pie-in-the-sky ideas that possibly require a whole new program.
+
+
 BUGS ---------------------------------------------------------------
 
 "hosts allow" with unresolvable addresses?
