@@ -27,8 +27,6 @@ struct stats stats;
 
 extern int verbose;
 
-static void show_malloc_stats(void);
-
 /****************************************************************************
 wait for a process to exit, calling io_flush while waiting
 ****************************************************************************/
@@ -56,7 +54,6 @@ void wait_process(pid_t pid, int *status)
  **/
 static void report(int f)
 {
-	time_t t = time(NULL);
 	extern int am_server;
 	extern int am_sender;
 	extern int am_daemon;
@@ -107,13 +104,11 @@ static void report(int f)
 		show_mem_stats();
 		show_flist_stats();
 		show_file_stats();
+		show_net_stats();
+		show_time_stats();
 	}
 	
 	if (verbose || do_stats) {
-		rprintf(FINFO,"wrote %.0f bytes  read %.0f bytes  %.2f bytes/sec\n",
-		       (double)stats.total_written,
-		       (double)stats.total_read,
-		       (stats.total_written+stats.total_read)/(0.5 + (t-starttime)));
 		rprintf(FINFO,"total size is %.0f  speedup is %.2f\n",
 		       (double)stats.total_size,
 		       (1.0*stats.total_size)/(stats.total_written+stats.total_read));

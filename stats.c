@@ -18,7 +18,9 @@
 
 #include "rsync.h"
 
-void show_file_stats()
+extern time_t starttime;
+
+void show_file_stats(void)
 {
 	extern struct stats stats;
 
@@ -41,11 +43,23 @@ void show_file_stats()
 		(double)stats.literal_data,
 		(double)stats.matched_data,
 		"?", "?", "?", "?");
+}
 
-	rprintf(FINFO, "Network statistics\n");
-	
-	rprintf(FINFO,"Total bytes written: %.0f\n", 
-		(double)stats.total_written);
-	rprintf(FINFO,"Total bytes read: %.0f\n\n", 
-		(double)stats.total_read);
-}	
+
+void show_net_stats(void)
+{
+	time_t t = time(NULL);
+	rprintf(FINFO, "Network statistics\n"
+		" %10s %10s %10s\n"
+		" %10.0f %10.0f %10.2f    total bytes\n"
+		,
+		"read", "write", "bytes/s",
+		(double) stats.total_read,
+		(double) stats.total_written,
+		(stats.total_written+stats.total_read)/(0.5 + (t-starttime)));
+}
+
+
+void show_time_stats(void)
+{
+}
