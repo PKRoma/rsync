@@ -9,3 +9,6 @@ rsync changes in 2.6.0cvs
        - Don't check modes and ownership on config/password files,
          because this security test is more likely to be a pain than a
          help on Cygwin.
+
+    * More detailed and clearer output from the --stats option (Martin
+      Pool) 
