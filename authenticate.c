@@ -180,7 +180,7 @@ static char *getpassf(char *filename)
 	   rsync as a NT service. Besides, CYGWIN permissions won't
 	   give us any added security -- the security should be
 	   handled with NTFS ACL's. */
-	} else if ((st.st_mode & 06) != 0) {
+	else if ((st.st_mode & 06) != 0) {
 		rprintf(FERROR,"password file must not be other-accessible\n");
 		ok = 0;
 	} else if (am_root && (st.st_uid != 0)) {
