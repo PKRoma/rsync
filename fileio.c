@@ -95,15 +95,19 @@ int write_file(int f,char *buf,size_t len)
 
 
 
-/* this provides functionality somewhat similar to mmap() but using
-   read(). It gives sliding window access to a file. mmap() is not
-   used because of the possibility of another program (such as a
-   mailer) truncating the file thus giving us a SIGBUS */
-struct map_struct *map_file(int fd,OFF_T len)
+/*
+ * this provides functionality somewhat similar to mmap() but using
+ * read(). It gives sliding window access to a file. mmap() is not
+ * used because of the possibility of another program (such as a
+ * mailer) truncating the file thus giving us a SIGBUS 
+ */
+struct map_struct *map_file(int fd, OFF_T len)
 {
 	struct map_struct *map;
-	map = (struct map_struct *)malloc(sizeof(*map));
-	if (!map) out_of_memory("map_file");
+	map = (struct map_struct *) malloc_counted(sizeof(*map),
+						   &mems_map_struct);
+	if (!map)
+		out_of_memory("map_file");
 
 	map->fd = fd;
 	map->file_size = len;
@@ -115,6 +119,7 @@ struct map_struct *map_file(int fd,OFF_T len)
 
 	return map;
 }
+
 
 /* slide the read window in the file */
 char *map_ptr(struct map_struct *map,OFF_T offset,int len)

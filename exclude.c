@@ -2,6 +2,7 @@
      
    Copyright (C) 1996-2001 by Andrew Tridgell <tridge@samba.org>
    Copyright (C) 1996 by Paul Mackerras
+   Copyright (C) 2001-2002 by Martin Pool
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -35,7 +36,8 @@ static struct exclude_struct *make_exclude(const char *pattern, int include)
 {
 	struct exclude_struct *ret;
 
-	ret = (struct exclude_struct *)malloc(sizeof(*ret));
+	ret = (struct exclude_struct *) malloc_counted(sizeof(*ret),
+						       &mems_exclude_struct);
 	if (!ret) out_of_memory("make_exclude");
 
 	memset(ret, 0, sizeof(*ret));
@@ -196,6 +198,7 @@ void add_exclude_list(const char *pattern, struct exclude_struct ***list, int in
 		return;
 	}
 
+	/* TODO: Account for memory */
 	*list = (struct exclude_struct **)Realloc(*list,sizeof(struct exclude_struct *)*(len+2));
 	
 	if (!*list || !((*list)[len] = make_exclude(pattern, include)))

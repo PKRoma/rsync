@@ -47,6 +47,12 @@ void wait_process(pid_t pid, int *status)
 	*status = WEXITSTATUS(*status);
 }
 
+/**
+ * @todo Probably everybody who calls this function should previously
+ * wait for all messages to drain from their input; then call
+ * report().  That ought to allow us to get memory usage statistics
+ * from every process in a systematic way.
+ **/
 static void report(int f)
 {
 	time_t t = time(NULL);
@@ -56,12 +62,6 @@ static void report(int f)
 	extern int do_stats;
 	extern int remote_version;
 	int send_stats;
-
-	if (do_stats) {
-		/* These come out from every process */
-		show_malloc_stats();
-		show_flist_stats();
-	}
 
 	if (am_daemon) {
 		log_exit(0, __FILE__, __LINE__);
@@ -100,6 +100,12 @@ static void report(int f)
 		    rprintf(FINFO, "Use --stats -v to show stats\n");
 		    return;
 		}
+		
+		show_stats_header();
+		show_malloc_stats();
+		show_mem_stats();
+		show_flist_stats();
+
 		rprintf(FINFO,"\nNumber of files: %d\n", stats.num_files);
 		rprintf(FINFO,"Number of files transferred: %d\n", 
 		       stats.num_transferred_files);
@@ -133,6 +139,20 @@ static void report(int f)
 }
 
 
+void show_stats_header(void)
+{
+	extern int am_server;
+	extern int am_sender;
+	extern int am_daemon;
+
+	rprintf(FINFO, RSYNC_NAME "[%d] (%s%s%s) statistics:\n",
+		getpid(),
+		am_server ? "server " : "",
+		am_daemon ? "daemon " : "",
+		am_sender ? "sender" : "receiver");
+}
+
+
 /**
  * If our C library can get malloc statistics, then show them to FINFO
  **/
@@ -140,17 +160,10 @@ static void show_malloc_stats(void)
 {
 #ifdef HAVE_MALLINFO
 	struct mallinfo mi;
-	extern int am_server;
-	extern int am_sender;
-	extern int am_daemon;
 
 	mi = mallinfo();
 
-	rprintf(FINFO, RSYNC_NAME "[%d] (%s%s%s) heap statistics:\n",
-		getpid(),
-		am_server ? "server " : "",
-		am_daemon ? "daemon " : "",
-		am_sender ? "sender" : "receiver");
+	rprintf(FINFO, "heap statistics:\n");
 	rprintf(FINFO, "  arena:     %10d   (bytes from sbrk)\n", mi.arena);
 	rprintf(FINFO, "  ordblks:   %10d   (chunks not in use)\n", mi.ordblks);
 	rprintf(FINFO, "  smblks:    %10d\n", mi.smblks);

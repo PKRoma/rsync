@@ -114,60 +114,6 @@ void show_flist_stats(void)
 }
 
 
-static struct string_area *string_area_new(int size)
-{
-	struct string_area *a;
-
-	if (size <= 0)
-		size = ARENA_SIZE;
-	a = malloc(sizeof(*a));
-	if (!a)
-		out_of_memory("string_area_new");
-	a->current = a->base = malloc(size);
-	if (!a->current)
-		out_of_memory("string_area_new buffer");
-	a->end = a->base + size;
-	a->next = NULL;
-
-	return a;
-}
-
-static void string_area_free(struct string_area *a)
-{
-	struct string_area *next;
-
-	for (; a; a = next) {
-		next = a->next;
-		free(a->base);
-	}
-}
-
-static char *string_area_malloc(struct string_area **ap, int size)
-{
-	char *p;
-	struct string_area *a;
-
-	/* does the request fit into the current space? */
-	a = *ap;
-	if (a->current + size >= a->end) {
-		/* no; get space, move new string_area to front of the list */
-		a = string_area_new(size > ARENA_SIZE ? size : ARENA_SIZE);
-		a->next = *ap;
-		*ap = a;
-	}
-
-	/* have space; do the "allocation." */
-	p = a->current;
-	a->current += size;
-	return p;
-}
-
-static char *string_area_strdup(struct string_area **ap, const char *src)
-{
-	char *dest = string_area_malloc(ap, strlen(src) + 1);
-	return strcpy(dest, src);
-}
-
 static void list_file_entry(struct file_struct *f)
 {
 	char perms[11];
@@ -289,11 +235,12 @@ static char *flist_dir;
  * Make sure @p flist is big enough to hold at least @p flist->count
  * entries.
  **/
-static void flist_expand(struct file_list *flist)
+void flist_expand(struct file_list *flist)
 {
 	if (flist->count >= flist->malloced) {
 		size_t new_bytes;
 		void *new_ptr;
+		extern size_t mems_main_flist;
 		
 		if (flist->malloced < 1000)
 			flist->malloced += 1000;
@@ -307,11 +254,10 @@ static void flist_expand(struct file_list *flist)
 		else
 			new_ptr = malloc(new_bytes);
 
-		if (verbose >= 2) {
-			rprintf(FINFO, "expand file_list to %.0f bytes, did%s move\n",
-				(double) new_bytes,
-				(new_ptr == flist->files) ? " not" : "");
-		}
+		/* This routine is only ever called on the main file
+		 * list.  There's another flist used by hlink.c (it's
+		 * going away, though), but it is never expanded. */
+		mems_main_flist = new_bytes;
 		
 		flist->files = (struct file_struct **) new_ptr;
 
@@ -440,6 +386,17 @@ static void send_file_entry(struct file_struct *file, int f,
 }
 
 
+struct file_struct *alloc_file_struct(void)
+{
+	struct file_struct *fs = (struct file_struct *)
+	    malloc_counted(sizeof(struct file_struct), &mems_file_structs);
+	if (!fs)
+		out_of_memory("alloc_file_struct");
+	
+	return fs;
+}
+
+
 
 static void receive_file_entry(struct file_struct **fptr,
 			       unsigned flags, int f)
@@ -463,7 +420,7 @@ static void receive_file_entry(struct file_struct **fptr,
 	else
 		l2 = read_byte(f);
 
-	file = (struct file_struct *) malloc(sizeof(*file));
+	file = alloc_file_struct();
 	if (!file)
 		out_of_memory("receive_file_entry");
 	memset((char *) file, 0, sizeof(*file));
@@ -530,7 +487,8 @@ static void receive_file_entry(struct file_struct **fptr,
 			rprintf(FERROR, "overflow: l=%d\n", l);
 			overflow("receive_file_entry");
 		}
-		file->link = (char *) malloc(l + 1);
+		file->link = (char *) malloc_counted(l + 1,
+						     &mems_file_structs);
 		if (!file->link)
 			out_of_memory("receive_file_entry 2");
 		read_sbuf(f, file->link, l);
@@ -551,7 +509,8 @@ static void receive_file_entry(struct file_struct **fptr,
 #endif
 
 	if (always_checksum) {
-		file->sum = (char *) malloc(MD4_SUM_LENGTH);
+		file->sum = (char *) malloc_counted(MD4_SUM_LENGTH,
+						    &mems_file_structs);
 		if (!file->sum)
 			out_of_memory("md4 sum");
 		if (remote_version < 21) {
@@ -684,7 +643,7 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 	if (verbose > 2)
 		rprintf(FINFO, "make_file(%d,%s)\n", f, fname);
 
-	file = (struct file_struct *) malloc(sizeof(*file));
+	file = alloc_file_struct();
 	if (!file)
 		out_of_memory("make_file");
 	memset((char *) file, 0, sizeof(*file));
@@ -1033,18 +992,7 @@ struct file_list *recv_file_list(int f)
 
 	start_read = stats.total_read;
 
-	flist = (struct file_list *) malloc(sizeof(flist[0]));
-	if (!flist)
-		goto oom;
-
-	flist->count = 0;
-	flist->malloced = 1000;
-	flist->files =
-	    (struct file_struct **) malloc(sizeof(flist->files[0]) *
-					   flist->malloced);
-	if (!flist->files)
-		goto oom;
-
+	flist = flist_new();
 
 	for (flags = read_byte(f); flags; flags = read_byte(f)) {
 		int i = flist->count;
@@ -1107,7 +1055,6 @@ struct file_list *recv_file_list(int f)
 
 	return flist;
 
-      oom:
 	out_of_memory("recv_file_list");
 	return NULL;		/* not reached */
 }
@@ -1181,9 +1128,10 @@ struct file_list *flist_new()
 {
 	struct file_list *flist;
 
-	flist = (struct file_list *) malloc(sizeof(flist[0]));
+	flist = (struct file_list *) malloc_counted(sizeof(flist[0]),
+						    &mems_main_flist);
 	if (!flist)
-		out_of_memory("send_file_list");
+		out_of_memory("flist_new");
 
 	flist->count = 0;
 	flist->malloced = 0;
@@ -1196,6 +1144,7 @@ struct file_list *flist_new()
 #endif
 	return flist;
 }
+
 
 /*
  * free up all elements in a flist

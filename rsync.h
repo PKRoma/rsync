@@ -354,12 +354,7 @@ struct file_struct {
 
 #define ARENA_SIZE	(32 * 1024)
 
-struct string_area {
-	char *base;
-	char *end;
-	char *current;
-	struct string_area *next;
-};
+struct string_area;
 
 struct file_list {
 	int count;
@@ -574,6 +569,8 @@ extern int errno;
 
 #endif
 
+#define UNUSED(x) x __attribute__((__unused__))
+
 
 /* use magic gcc attributes to catch format errors */
  void rprintf(enum logcode , const char *, ...)
@@ -617,4 +614,11 @@ inet_ntop(int af, const void *src, char *dst, size_t size);
 int isc_net_pton(int af, const char *src, void *dst);
 #endif
 
-#define UNUSED(x) x __attribute__((__unused__))
+/** Memory-accounting stuff from memstats.c. */
+extern size_t mems_file_structs, mems_main_flist, mems_string_areas,
+	mems_exclude_struct,
+	mems_map_struct,
+	mems_tags,
+	mems_delete_list,
+	mems_hlink_list;
+

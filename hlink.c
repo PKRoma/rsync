@@ -58,8 +58,9 @@ void init_hard_links(struct file_list *flist)
 		free(hlink_list);
 
 	if (!(hlink_list =
-	      (struct file_struct *) malloc(sizeof(hlink_list[0]) *
-					    flist->count)))
+	      (struct file_struct *) malloc_counted(sizeof(hlink_list[0]) *
+						    flist->count,
+						    &mems_hlink_list)))
 		out_of_memory("init_hard_links");
 
 	for (i = 0; i < flist->count; i++)

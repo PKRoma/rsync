@@ -66,8 +66,11 @@ static int delete_already_done(struct file_list *flist,int j)
 static void add_delete_entry(struct file_struct *file)
 {
 	if (dlist_len == dlist_alloc_len) {
+		size_t new_bytes;
 		dlist_alloc_len += 1024;
-		delete_list = (struct delete_list *)Realloc(delete_list, sizeof(delete_list[0])*dlist_alloc_len);
+		new_bytes = sizeof(delete_list[0])*dlist_alloc_len;
+		mems_delete_list = new_bytes;
+		delete_list = (struct delete_list *)Realloc(delete_list, new_bytes);
 		if (!delete_list) out_of_memory("add_delete_entry");
 	}
 
