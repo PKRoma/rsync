@@ -2,6 +2,11 @@
 
 BUGS ---------------------------------------------------------------
 
+"hosts allow" with unresolvable addresses?
+
+  It's possible that the getaddrinfo() patch has broken this.
+
+
 There seems to be a bug with hardlinks
 
   mbp/2 build$ ls -l /tmp/a /tmp/b -i
