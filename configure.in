@@ -570,4 +570,9 @@ AC_OUTPUT
 
 AC_MSG_RESULT()
 AC_MSG_RESULT([    rsync ${RSYNC_VERSION} configuration successful])
+AC_MSG_RESULT([    install destination:])
+AC_MSG_RESULT([      prefix=${prefix}])
+AC_MSG_RESULT([      exec_prefix=${exec_prefix}])
+AC_MSG_RESULT([      bindir=${bindir}])
+AC_MSG_RESULT([      bindir=${mandir}])
 AC_MSG_RESULT()
