@@ -30,7 +30,6 @@ struct string_area {
 struct string_area *string_area_new(int size)
 {
 	struct string_area *a;
-	extern size_t mems_string_areas;
 
 	if (size <= 0)
 		size = ARENA_SIZE;
@@ -43,7 +42,7 @@ struct string_area *string_area_new(int size)
 	a->end = a->base + size;
 	a->next = NULL;
 
-	mems_string_areas += sizeof(*a) + size;
+	stats.string_areas += sizeof(*a) + size;
 
 	return a;
 }

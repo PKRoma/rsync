@@ -47,8 +47,9 @@ void wait_process(pid_t pid, int *status)
 	*status = WEXITSTATUS(*status);
 }
 
+
 /**
- * @todo Probably everybody who calls this function should previously
+ * @todox Probably everybody who calls this function should previously
  * wait for all messages to drain from their input; then call
  * report().  That ought to allow us to get memory usage statistics
  * from every process in a systematic way.
@@ -105,23 +106,7 @@ static void report(int f)
 		show_malloc_stats();
 		show_mem_stats();
 		show_flist_stats();
-
-		rprintf(FINFO,"\nNumber of files: %d\n", stats.num_files);
-		rprintf(FINFO,"Number of files transferred: %d\n", 
-		       stats.num_transferred_files);
-		rprintf(FINFO,"Total file size: %.0f bytes\n", 
-		       (double)stats.total_size);
-		rprintf(FINFO,"Total transferred file size: %.0f bytes\n", 
-		       (double)stats.total_transferred_size);
-		rprintf(FINFO,"Literal data: %.0f bytes\n", 
-		       (double)stats.literal_data);
-		rprintf(FINFO,"Matched data: %.0f bytes\n", 
-		       (double)stats.matched_data);
-		rprintf(FINFO,"File list size: %d\n", stats.flist_size);
-		rprintf(FINFO,"Total bytes written: %.0f\n", 
-		       (double)stats.total_written);
-		rprintf(FINFO,"Total bytes read: %.0f\n\n", 
-		       (double)stats.total_read);
+		show_file_stats();
 	}
 	
 	if (verbose || do_stats) {

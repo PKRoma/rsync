@@ -30,44 +30,33 @@
 /* TODO: Perhaps show these numbers with commas to make them a bit
  * more readable. */
 
-/** Size in bytes of main flist **/
-size_t mems_main_flist;
-
-/** Total allocated to file_structs **/
-size_t mems_file_structs;
-
-
-/** Total allocation and overhead in string_areas */
-size_t mems_string_areas;
-size_t mems_exclude_struct;
-size_t mems_map_struct;
-size_t mems_tags;
-size_t mems_delete_list;
-size_t mems_hlink_list;
-
 /**
  * If our C library can get malloc statistics, then show them to FINFO
  **/
 void show_mem_stats(void)
 {
-	rprintf(FINFO, "memory usage:\n"
-		"  %10ld  file_list\n"
-		"  %10ld  hlink_list\n"
-		"  %10ld  file_structs (and associated data)\n"
-		"  %10ld  string_areas\n"
-		"  %10ld  exclude_structs\n"
-		"  %10ld  map_structs\n"
-		"  %10ld  tags\n"
-		"  %10ld  delete_list\n"
+	extern struct stats stats;
+	
+	rprintf(FINFO, "Memory usage:\n"
+		"  %10ld    bytes file_list\n"
+		"    %10ld  bytes flist_size\n"  
+		"  %10ld    bytes hlink_list\n"
+		"  %10ld    bytes file_structs (and associated data)\n"
+		"  %10ld    bytes string_areas\n"
+		"  %10ld    bytes exclude_structs\n"
+		"  %10ld    bytes map_structs\n"
+		"  %10ld    bytes tags\n"
+		"  %10ld    bytes delete_list\n"
 		,
-		(long) mems_main_flist,
-		(long) mems_hlink_list,
-		(long) mems_file_structs,
-		(long) mems_string_areas,
-		(long) mems_exclude_struct,
-		(long) mems_map_struct,
-		(long) mems_tags,
-		(long) mems_delete_list);
+		(long) stats.main_flist,
+		(long) stats.flist_size,
+		(long) stats.hlink_list,
+		(long) stats.file_structs,
+		(long) stats.string_areas,
+		(long) stats.exclude_struct,
+		(long) stats.map_struct,
+		(long) stats.tags,
+		(long) stats.delete_list);
 }
 
 

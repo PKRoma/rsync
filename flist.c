@@ -240,7 +240,6 @@ void flist_expand(struct file_list *flist)
 	if (flist->count >= flist->malloced) {
 		size_t new_bytes;
 		void *new_ptr;
-		extern size_t mems_main_flist;
 		
 		if (flist->malloced < 1000)
 			flist->malloced += 1000;
@@ -257,7 +256,7 @@ void flist_expand(struct file_list *flist)
 		/* This routine is only ever called on the main file
 		 * list.  There's another flist used by hlink.c (it's
 		 * going away, though), but it is never expanded. */
-		mems_main_flist = new_bytes;
+		stats.main_flist = new_bytes;
 		
 		flist->files = (struct file_struct **) new_ptr;
 
@@ -389,7 +388,7 @@ static void send_file_entry(struct file_struct *file, int f,
 struct file_struct *alloc_file_struct(void)
 {
 	struct file_struct *fs = (struct file_struct *)
-	    malloc_counted(sizeof(struct file_struct), &mems_file_structs);
+	    malloc_counted(sizeof(struct file_struct), &stats.file_structs);
 	if (!fs)
 		out_of_memory("alloc_file_struct");
 	
@@ -488,7 +487,7 @@ static void receive_file_entry(struct file_struct **fptr,
 			overflow("receive_file_entry");
 		}
 		file->link = (char *) malloc_counted(l + 1,
-						     &mems_file_structs);
+						     &stats.file_structs);
 		if (!file->link)
 			out_of_memory("receive_file_entry 2");
 		read_sbuf(f, file->link, l);
@@ -510,7 +509,7 @@ static void receive_file_entry(struct file_struct **fptr,
 
 	if (always_checksum) {
 		file->sum = (char *) malloc_counted(MD4_SUM_LENGTH,
-						    &mems_file_structs);
+						    &stats.file_structs);
 		if (!file->sum)
 			out_of_memory("md4 sum");
 		if (remote_version < 21) {
@@ -1129,7 +1128,7 @@ struct file_list *flist_new()
 	struct file_list *flist;
 
 	flist = (struct file_list *) malloc_counted(sizeof(flist[0]),
-						    &mems_main_flist);
+						    &stats.main_flist);
 	if (!flist)
 		out_of_memory("flist_new");
 

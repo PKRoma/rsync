@@ -105,7 +105,7 @@ struct map_struct *map_file(int fd, OFF_T len)
 {
 	struct map_struct *map;
 	map = (struct map_struct *) malloc_counted(sizeof(*map),
-						   &mems_map_struct);
+						   &stats.map_struct);
 	if (!map)
 		out_of_memory("map_file");
 

@@ -37,7 +37,7 @@ static struct exclude_struct *make_exclude(const char *pattern, int include)
 	struct exclude_struct *ret;
 
 	ret = (struct exclude_struct *) malloc_counted(sizeof(*ret),
-						       &mems_exclude_struct);
+						       &stats.exclude_struct);
 	if (!ret) out_of_memory("make_exclude");
 
 	memset(ret, 0, sizeof(*ret));

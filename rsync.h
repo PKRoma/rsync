@@ -394,7 +394,7 @@ struct exclude_struct {
 	int local;
 };
 
-struct stats {
+extern struct stats {
 	int64 total_size;
 	int64 total_transferred_size;
 	int64 total_written;
@@ -404,7 +404,18 @@ struct stats {
 	int flist_size;
 	int num_files;
 	int num_transferred_files;
-};
+
+	/** Memory-accounting stuff from memstats.c. */
+	size_t file_structs, main_flist, string_areas,
+		exclude_struct,
+		map_struct,
+		tags,
+		delete_list,
+		hlink_list;
+
+	int num_new_files;
+	int64 new_files_size;
+} stats;
 
 
 /* we need this function because of the silly way in which duplicate
@@ -613,12 +624,4 @@ inet_ntop(int af, const void *src, char *dst, size_t size);
 #ifndef HAVE_INET_PTON
 int isc_net_pton(int af, const char *src, void *dst);
 #endif
-
-/** Memory-accounting stuff from memstats.c. */
-extern size_t mems_file_structs, mems_main_flist, mems_string_areas,
-	mems_exclude_struct,
-	mems_map_struct,
-	mems_tags,
-	mems_delete_list,
-	mems_hlink_list;
 
